@@ -4,14 +4,16 @@
 packages:
 # builder stage in image/rhel/konflux.Dockerfile
 - jq
-# final stage in image/rhel/konflux.Dockerfile
+# final stage in image/rhel/konflux.Dockerfile, package_installer in scanner/image/scanner/konflux.Dockerfile
 - findutils
 - postgresql
 # builder stage in operator/konflux.bundle.Dockerfile
 - python3.12-pyyaml
-# package_installer stages in image/roxctl/konflux.Dockerfile
+# package_installer stages in operator/konflux.Dockerfile, image/roxctl/konflux.Dockerfile, scanner/image/scanner/konflux.Dockerfile
 - ca-certificates
 - openssl
+# package_installer stage in scanner/image/scanner/konflux.Dockerfile
+- util-linux
 moduleEnable:
 # final stage in image/rhel/konflux.Dockerfile
 - postgresql:15

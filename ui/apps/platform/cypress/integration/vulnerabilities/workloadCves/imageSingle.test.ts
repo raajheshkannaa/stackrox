@@ -51,7 +51,14 @@ describe('Workload CVE Image Single page', () => {
         cy.get(compoundFiltersSelectors.entityMenuToggle).click();
     });
 
-    it('should display consistent data between the cards and the table test', () => {
+    it('should display consistent data between the cards and the table test', function () {
+        // Scanner V4 may report the same CVE with different severities, the counts
+        // tested here will differ.
+        // TODO(ROX-33633): Re-enable.
+        if (hasFeatureFlag('ROX_SCANNER_V4')) {
+            this.skip();
+        }
+
         visitFirstImage();
 
         const severityCardSelector = vulnSelectors.summaryCard('CVEs by severity');

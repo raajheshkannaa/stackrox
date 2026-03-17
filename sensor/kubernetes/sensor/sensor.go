@@ -230,6 +230,17 @@ func CreateSensor(cfg *CreateOptions) (*sensor.Sensor, error) {
 		)
 	}
 
+	if features.SensitiveFileActivity.Enabled() && factSettingsMgr != nil {
+		components = append(components,
+			configmap.NewConfigMapPersister(
+				"fact",
+				sensorNamespace,
+				cfg.k8sClient.Kubernetes(),
+				factSettingsMgr.ConfigMapStream().Iterator(false),
+			),
+		)
+	}
+
 	if centralsensor.SecuredClusterIsNotManagedManually(helmManagedConfig) {
 		podName := os.Getenv("POD_NAME")
 		components = append(components,
@@ -282,17 +293,6 @@ func CreateSensor(cfg *CreateOptions) (*sensor.Sensor, error) {
 		fileSystemPipeline := filesystemPipeline.NewFileSystemPipeline(policyDetector, storeProvider.Entities(), activityChan)
 		fileSystemService := filesystemService.NewService(fileSystemPipeline, activityChan)
 		apiServices = append(apiServices, fileSystemService)
-
-		if factSettingsMgr != nil {
-			components = append(components,
-				configmap.NewConfigMapPersister(
-					"fact",
-					sensorNamespace,
-					cfg.k8sClient.Kubernetes(),
-					factSettingsMgr.ConfigMapStream().Iterator(false),
-				),
-			)
-		}
 	}
 
 	if features.VirtualMachines.Enabled() {

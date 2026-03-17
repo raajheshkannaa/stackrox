@@ -2276,6 +2276,33 @@
                 "id": 4,
                 "name": "auto_lock_process_baselines_config",
                 "type": "AutoLockProcessBaselinesConfig"
+              },
+              {
+                "id": 5,
+                "name": "runtime_data_control",
+                "type": "RuntimeDataControl"
+              }
+            ],
+            "messages": [
+              {
+                "name": "RuntimeDataControl",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "namespace_filter",
+                    "type": "string"
+                  },
+                  {
+                    "id": 2,
+                    "name": "exclude_openshift",
+                    "type": "bool"
+                  },
+                  {
+                    "id": 3,
+                    "name": "persistence",
+                    "type": "bool"
+                  }
+                ]
               }
             ]
           },
@@ -4072,22 +4099,6 @@
             ]
           },
           {
-            "name": "ComplianceOperatorRuleV2.OperatorKind",
-            "enum_fields": [
-              {
-                "name": "OPERATOR_KIND_UNSPECIFIED"
-              },
-              {
-                "name": "RULE",
-                "integer": 1
-              },
-              {
-                "name": "CUSTOM_RULE",
-                "integer": 2
-              }
-            ]
-          },
-          {
             "name": "ComplianceOperatorProfileV2.OperatorKind",
             "enum_fields": [
               {
@@ -4099,6 +4110,22 @@
               },
               {
                 "name": "TAILORED_PROFILE",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "ComplianceOperatorRuleV2.OperatorKind",
+            "enum_fields": [
+              {
+                "name": "OPERATOR_KIND_UNSPECIFIED"
+              },
+              {
+                "name": "RULE",
+                "integer": 1
+              },
+              {
+                "name": "CUSTOM_RULE",
                 "integer": 2
               }
             ]

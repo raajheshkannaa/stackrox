@@ -116,3 +116,15 @@ export function assertDeploymentsAreNotMatched(deployments) {
         cy.get(collectionSelectors.deploymentResult(deployment)).should('not.exist')
     );
 }
+
+/**
+ * Clicks the "View more" button if it is present.
+ * Use this after waiting for initial results to load when the full result set may span multiple pages.
+ */
+export function tryClickViewMore() {
+    cy.get('body').then(($body) => {
+        if ($body.find(collectionSelectors.viewMoreResultsButton).length > 0) {
+            cy.get(collectionSelectors.viewMoreResultsButton).scrollIntoView().click();
+        }
+    });
+}

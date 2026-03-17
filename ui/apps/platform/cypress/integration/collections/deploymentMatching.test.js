@@ -3,6 +3,7 @@ import {
     assertDeploymentsAreMatched,
     assertDeploymentsAreMatchedExactly,
     assertDeploymentsAreNotMatched,
+    tryClickViewMore,
     tryDeleteCollection,
     visitCollections,
 } from './Collections.helpers';
@@ -35,8 +36,11 @@ describe('Collection deployment matching', () => {
         cy.get('button:contains("Namespaces with names matching")').click();
         cy.get('input[aria-label="Select value 1 of 1 for the namespace name"]').type('stackrox');
 
-        // Test that Stackrox deployments are matched
-        assertDeploymentsAreMatched(['central', 'central-db', 'collector', 'scanner', 'sensor']);
+        // Wait for initial results to load, then load more pages if needed.
+        // When Scanner V4 is enabled, extra deployments push 'sensor' to the second page.
+        assertDeploymentsAreMatched(['central']);
+        tryClickViewMore();
+        assertDeploymentsAreMatched(['central-db', 'collector', 'scanner', 'sensor']);
 
         // Restrict collection to two specific deployments
         cy.get('button:contains("No deployments specified")').click();

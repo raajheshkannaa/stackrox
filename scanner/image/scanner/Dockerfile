@@ -1,6 +1,3 @@
-# Migration to ubi8-micro base image
-# Scanner needs bash and utilities for entrypoint scripts
-
 ARG MAPPINGS_REGISTRY=registry.access.redhat.com
 ARG MAPPINGS_BASE_IMAGE=ubi8
 ARG MAPPINGS_BASE_TAG=latest
@@ -11,29 +8,25 @@ ARG BASE_REGISTRY=registry.access.redhat.com
 ARG BASE_IMAGE=ubi8-micro
 ARG BASE_TAG=latest
 
-# ============================================================================
-# Stage 1: mappings - Download vulnerability mappings
-# ============================================================================
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG} AS ubi-micro-base
+
 FROM ${MAPPINGS_REGISTRY}/${MAPPINGS_BASE_IMAGE}:${MAPPINGS_BASE_TAG} AS mappings
 
 COPY download-mappings.sh /download-mappings.sh
 RUN /download-mappings.sh /mappings
 
-# ============================================================================
-# Stage 2: dependency_builder - Install runtime dependencies for ubi8-micro
-# ============================================================================
 FROM ${RPMS_REGISTRY}/${RPMS_BASE_IMAGE}:${RPMS_BASE_TAG} AS dependency_builder
 
-# Install minimal required runtime dependencies to /out/
-# These are needed for the shell scripts (entrypoint.sh, restore-all-dir-contents, etc.)
+# Copy ubi-micro base to preserve rpmdb
+COPY --from=ubi-micro-base / /out/
+
+# Install packages not in ubi-micro (bash and coreutils-single already present)
 RUN dnf install \
     --installroot=/out/ \
     --releasever=8 \
     --setopt=install_weak_deps=0 \
     --nodocs \
     -y \
-    bash \
-    coreutils \
     findutils \
     util-linux \
     ca-certificates && \
@@ -47,11 +40,7 @@ COPY scripts/save-dir-contents /out/usr/local/bin/
 RUN chown -R 65534:65534 /out/etc/pki/ca-trust /out/etc/ssl /out/tmp && \
     chroot /out /usr/local/bin/save-dir-contents /etc/pki/ca-trust /etc/ssl
 
-# ============================================================================
-# Stage 3: FINAL - ubi8-micro runtime image
-# NO package manager operations allowed in this stage!
-# ============================================================================
-FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG}
+FROM ubi-micro-base
 
 ARG LABEL_VERSION
 ARG LABEL_RELEASE
@@ -66,7 +55,6 @@ LABEL name="scanner-v4" \
       release="${LABEL_RELEASE}" \
       quay.expires-after="${QUAY_TAG_EXPIRATION}"
 
-# Copy all dependencies from builder (bash, coreutils, ca-certificates, etc.)
 COPY --from=dependency_builder /out/ /
 
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
@@ -81,7 +69,6 @@ COPY THIRD_PARTY_NOTICES/ /THIRD_PARTY_NOTICES/
 # Copy vulnerability mappings
 COPY --from=mappings /mappings/repository-to-cpe.json /mappings/container-name-repos-map.json /run/mappings/
 
-# This is equivalent to nobody:nobody.
 USER 65534:65534
 
 ENTRYPOINT ["entrypoint.sh"]

@@ -91,8 +91,8 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 		detail    v1.ComputeEffectiveAccessScopeRequest_Detail
 	}
 
-	testCases := []testCase{
-		{
+	testCaseMap := map[string]testCase{
+		"no access scope includes nothing": {
 			desc:      "no access scope includes nothing",
 			scopeDesc: `nil => { }`,
 			scopeStr:  "",
@@ -136,7 +136,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"empty access scope includes nothing": {
 			desc:      "empty access scope includes nothing",
 			scopeDesc: `∅ => { }`,
 			scopeStr:  "",
@@ -183,7 +183,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"selector with empty requirements includes nothing": {
 			desc:      "selector with empty requirements includes nothing",
 			scopeDesc: `cluster.labels: ∅ => { }`,
 			scopeStr:  "",
@@ -236,7 +236,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"cluster included by name includes all its namespaces": {
 			desc:      "cluster included by name includes all its namespaces",
 			scopeDesc: `cluster: "Arrakis" => { "Arrakis::*" }`,
 			scopeStr:  "Arrakis::*",
@@ -286,7 +286,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"cluster included by name (not matching k8s label syntax) includes all its namespaces": {
 			desc:      "cluster included by name (not matching k8s label syntax) includes all its namespaces",
 			scopeDesc: `cluster: "Giedi=Prime" => { "Giedi=Prime::*" }`,
 			scopeStr:  "Giedi=Prime::*",
@@ -336,7 +336,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"cluster included have empty namespaces in minimal form": {
 			desc:      "cluster included have empty namespaces in minimal form",
 			scopeDesc: `cluster: "Arrakis" => { "Arrakis::*" }`,
 			scopeStr:  "Arrakis::*",
@@ -361,7 +361,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_MINIMAL,
 			hasError: false,
 		},
-		{
+		"cluster(s) included by label include all underlying namespaces": {
 			desc:      "cluster(s) included by label include all underlying namespaces",
 			scopeDesc: `cluster.labels: focus in (melange) => { "Arrakis::*, Giedi=Prime::*" }`,
 			scopeStr:  "Arrakis::*, Giedi=Prime::*",
@@ -411,7 +411,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"namespace included by name (and cluster name) does not include anything else": {
 			desc:      "namespace included by name does not include anything else",
 			scopeDesc: `namespace: "Arrakis::Atreides" => { "Arrakis::Atreides" }`,
 			scopeStr:  "Arrakis::Atreides",
@@ -466,7 +466,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"namespace included by name but wrong cluster name does not include anything": {
 			desc:      "namespace included by name but wrong cluster name does not include anything",
 			scopeDesc: `namespace: "Giedi=Prime::Atreides" => { }`,
 			scopeStr:  "",
@@ -521,7 +521,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"namespace included by name (and cluster id) does not include anything else": {
 			desc:      "namespace included by name does not include anything else",
 			scopeDesc: `namespace: "Arrakis::Atreides" => { "Arrakis::Atreides" }`,
 			scopeStr:  "Arrakis::Atreides",
@@ -576,7 +576,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"namespace included by name but wrong cluster ID does not include anything": {
 			desc:      "namespace included by name but wrong cluster ID does not include anything",
 			scopeDesc: `namespace: "Giedi=Prime::Atreides" => { }`,
 			scopeStr:  "",
@@ -631,7 +631,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"namespace(s) included by label do not include anything else": {
 			desc:      "namespace(s) included by label do not include anything else",
 			scopeDesc: `namespace.labels: focus in (melange) => { "Arrakis::Atreides", "Arrakis::Harkonnen", "Giedi=Prime::Harkonnen" }`,
 			scopeStr:  "Arrakis::{Atreides, Harkonnen}, Giedi=Prime::Harkonnen",
@@ -681,7 +681,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"inclusion by label works across clusters": {
 			desc:      "inclusion by label works across clusters",
 			scopeDesc: `namespace.labels: focus in (transportation) => { "Earth::Skunk Works", "Arrakis::Spacing Guild" }`,
 			scopeStr:  "Arrakis::Spacing Guild, Earth::Skunk Works",
@@ -731,7 +731,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"inclusion by label groups labels by AND and set values by OR": {
 			desc:      "inclusion by label groups labels by AND and set values by OR",
 			scopeDesc: `namespace.labels: focus in (transportation, applied_research), region in (NA, dune_universe) => { "Earth::Skunk Works", "Earth::JPL", "Arrakis::Spacing Guild" }`,
 			scopeStr:  "Arrakis::Spacing Guild, Earth::{JPL, Skunk Works}",
@@ -788,7 +788,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"inclusion by label supports EXISTS, NOT_EXISTS, and NOTIN operators": {
 			desc:      "inclusion by label supports EXISTS, NOT_EXISTS, and NOTIN operators",
 			scopeDesc: `namespace.labels: focus notin (physics, melange), clearance, !founded => { "Earth::Skunk Works" }`,
 			scopeStr:  "Earth::Skunk Works",
@@ -846,7 +846,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"multiple label selectors are joined by OR": {
 			desc:      "multiple label selectors are joined by OR",
 			scopeDesc: `namespace.labels: focus in (transportation), region in (NA) OR region in (EU) OR founded in (1949) => { "Earth::Skunk Works", "Earth::Fraunhofer", "Earth::CERN" }`,
 			scopeStr:  "Earth::{CERN, Fraunhofer, Skunk Works}",
@@ -905,7 +905,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"rules are joined by OR": {
 			desc:      "rules are joined by OR",
 			scopeDesc: `namespace: "Earth::Skunk Works" OR cluster.labels: focus in (melange) OR namespace.labels: region in (EU) => { "Earth::Skunk Works", "Earth::Fraunhofer", "Earth::CERN", "Arrakis::*", "Giedi=Prime::*" }`,
 			scopeStr:  "Arrakis::*, Earth::{CERN, Fraunhofer, Skunk Works}, Giedi=Prime::*",
@@ -962,7 +962,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_HIGH,
 			hasError: false,
 		},
-		{
+		"all excluded namespaces are removed from cluster in minimal form": {
 			desc:      "all excluded namespaces are removed from cluster in minimal form",
 			scopeDesc: `"namespace.labels: focus in (melange)" => { "Arrakis::Atreides", "Arrakis::Harkonnen", "Giedi=Prime::Harkonnen" }`,
 			scopeStr:  "Arrakis::{Atreides, Harkonnen}, Giedi=Prime::Harkonnen",
@@ -1007,7 +1007,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_MINIMAL,
 			hasError: false,
 		},
-		{
+		"no labels in standard form": {
 			desc:      "no labels in standard form",
 			scopeDesc: `"namespace.labels: focus in (melange)" => { "Arrakis::Atreides", "Arrakis::Harkonnen", "Giedi=Prime::Harkonnen" }`,
 			scopeStr:  "Arrakis::{Atreides, Harkonnen}, Giedi=Prime::Harkonnen",
@@ -1063,7 +1063,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			detail:   v1.ComputeEffectiveAccessScopeRequest_STANDARD,
 			hasError: false,
 		},
-		{
+		"no key in cluster label selector": {
 			desc: "no key in cluster label selector",
 			scope: &storage.SimpleAccessScope{
 				Id:   accessScopeID,
@@ -1074,7 +1074,7 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 			},
 			hasError: true,
 		},
-		{
+		"no key in namespace label selector": {
 			desc: "no key in namespace label selector",
 			scope: &storage.SimpleAccessScope{
 				Id:   accessScopeID,
@@ -1087,8 +1087,8 @@ func TestComputeEffectiveAccessScope(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.desc, func(t *testing.T) {
+	for desc, tc := range testCaseMap {
+		t.Run(desc, func(t *testing.T) {
 			var clonedClusters []*storage.Cluster
 			inputClusters := make([]Cluster, 0, len(clusters))
 			for _, c := range clusters {

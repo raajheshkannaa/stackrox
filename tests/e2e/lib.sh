@@ -15,6 +15,7 @@ source "$TEST_ROOT/scripts/ci/test_state.sh"
 
 export QA_TEST_DEBUG_LOGS="/tmp/qa-tests-backend-logs"
 export QA_DEPLOY_WAIT_INFO="/tmp/wait-for-kubectl-object"
+export SFA_AGENT="${SFA_AGENT:-true}"
 
 # If `envsubst` is contained in a non-standard directory `env -i` won't be able to
 # execute it, even though it can be located via `$PATH`, hence we retrieve the absolute path of
@@ -446,8 +447,8 @@ deploy_sensor_via_operator() {
         secured_cluster_yaml_path="tests/e2e/yaml/secured-cluster-cr-with-scanner-v4.envsubst.yaml"
     fi
 
-    if [[ "${SFA_AGENT:-}" == "Enabled" ]]; then
-       echo "Enabling File Activity Monitoring due to SFA_AGENT variable: ${SFA_AGENT}"
+    if [[ "${SFA_AGENT:-false}" == "true" ]]; then
+       echo "Enabling File Activity Monitoring"
        fam_mode_setting="Enabled"
     fi
 

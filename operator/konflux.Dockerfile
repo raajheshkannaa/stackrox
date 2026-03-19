@@ -14,7 +14,7 @@ ENV GOTAGS="release,strictfipsruntime"
 ENV GOEXPERIMENT=strictfipsruntime
 ENV CI=1 GOFLAGS="" CGO_ENABLED=1
 
-RUN GOOS=linux GOARCH=$(go env GOARCH) scripts/go-build-file.sh operator/cmd/main.go image/bin/operator
+RUN GOOS=linux GOARCH=$(go env GOARCH) scripts/go-build-file.sh operator/stackrox-operator/main.go image/bin/operator
 
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:latest@sha256:5dc6ba426ccbeb3954ead6b015f36b4a2d22320e5b356b074198d08422464ed2

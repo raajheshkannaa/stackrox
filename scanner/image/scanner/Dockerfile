@@ -36,6 +36,10 @@ RUN dnf install \
 # Copy scripts needed for CA trust setup
 COPY scripts/save-dir-contents /out/usr/local/bin/
 
+# The contents of paths mounted as emptyDir volumes in Kubernetes are saved
+# by the script `save-dir-contents` during the image build. The directory
+# contents are then restored by the script `restore-all-dir-contents`
+# during the container start.
 # Setup CA trust directories with proper permissions in /out/
 RUN chown -R 65534:65534 /out/etc/pki/ca-trust /out/etc/ssl /out/tmp && \
     chroot /out /usr/local/bin/save-dir-contents /etc/pki/ca-trust /etc/ssl

@@ -46,11 +46,19 @@ COPY --from=builder \
     /src/scanner/image/scanner/bin/scanner \
     /out/usr/local/bin/
 
+# The mapping files are not optional.
+# The helm chart hard codes in the indexer config the path to the mapping
+# files.  If the file does not exist, the indexer raises an error during bootstrap.
+# (Note that the file is downloaded from Central after initial seeding.)
 # Mapping files required by indexer config
 COPY .konflux/scanner-data/repository-to-cpe.json .konflux/scanner-data/container-name-repos-map.json /out/run/mappings/
 
 COPY LICENSE /out/licenses/LICENSE
 
+# The contents of paths mounted as emptyDir volumes in Kubernetes are saved
+# by the script `save-dir-contents` during the image build. The directory
+# contents are then restored by the script `restore-all-dir-contents`
+# during the container start.
 RUN chown -R 65534:65534 /out/tmp /out/etc/pki/ca-trust /out/etc/ssl && \
     chroot /out /usr/local/bin/save-dir-contents /etc/pki/ca-trust /etc/ssl
 

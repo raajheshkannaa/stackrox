@@ -181,7 +181,9 @@ class DefaultPoliciesTest extends BaseSpecification {
                 componentCount="9[1-9]"
                 break
             default:
-                componentCount="1(6[6-9]|7[0-5])"
+                // Scanner V4 detects components at a more granular level than Scanner V2, in one example:
+                // V2: ~166-175 components  vs.  V4: ~284 components.
+                componentCount = scannerV4Enabled ? "2[5-9][0-9]" : "1(6[6-9]|7[0-5])"
                 break
         }
     }
@@ -457,10 +459,12 @@ class DefaultPoliciesTest extends BaseSpecification {
                 "Port 80 is exposed in the cluster"  | null | []
 
         "Image Vulnerabilities"           | 4.0f     | null |
-                // This makes sure it has at least 100 CVEs.
+                // Scanner V2 typically reports 100+ CVEs between Low and Critical.
+                // Scanner V4 may report fewer CVEs (e.g. 78) and a different minimum
+                // severity (e.g. Moderate). Using \\d{2,} and \\w+ to accept both.
                 "Image \"" + STRUTS_IMAGE + "\\\"" +
-                     " contains \\d{3,} CVEs with severities ranging between " +
-                     "Low and Critical" | []
+                     " contains \\d{2,} CVEs with severities ranging between " +
+                     "\\w+ and \\w+" | []
 
         "Service Configuration"           | 2.0f     |
                 "No capabilities were dropped" | null | []

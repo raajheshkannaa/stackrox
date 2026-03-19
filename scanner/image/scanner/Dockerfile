@@ -62,7 +62,8 @@ SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 # Copy application scripts and binaries
 COPY scripts/entrypoint.sh \
      scripts/import-additional-cas \
-     scripts/restore-all-dir-contents /usr/local/bin/
+     scripts/restore-all-dir-contents \
+     scripts/save-dir-contents /usr/local/bin/
 COPY bin/scanner /usr/local/bin/
 COPY THIRD_PARTY_NOTICES/ /THIRD_PARTY_NOTICES/
 

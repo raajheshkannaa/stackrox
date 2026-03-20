@@ -10,6 +10,7 @@ import services.ImageService
 import util.Timer
 import util.Env
 
+import spock.lang.Shared
 import spock.lang.Tag
 import spock.lang.Unroll
 import spock.lang.IgnoreIf
@@ -17,13 +18,10 @@ import spock.lang.IgnoreIf
 @Tag("PZ")
 class DeploymentTest extends BaseSpecification {
     private static final String DEPLOYMENT_NAME = "image-join"
-    // The image name in quay.io includes the SHA from the original image
-    // imported from docker.io which is somewhat confusingly different.
     private static final String DEPLOYMENT_IMAGE_NAME =
-        "quay.io/rhacs-eng/qa-multi-arch:nginx-204a9a8e65061b10b92ad361dd6f406248404fe60efd5d6a8f2595f18bb37aad"
-    private static final String DEPLOYMENT_IMAGE_SHA =
-        "b73f527d86e3461fd652f62cf47e7b375196063bbbd503e853af5be16597cb2e"
-    private static final String CVE_NO = "CVE-2018-18314"
+        "quay.io/rhacs-eng/qa-multi-arch:nginx-3.21-1"
+
+    private static final String CVE_NO = "CVE-2019-11068"
     private static final String GKE_ORCHESTRATOR_DEPLOYMENT_NAME = "kube-dns"
     private static final String OPENSHIFT_ORCHESTRATOR_NAMESPACE = Env.getManagedControlPlane() == "true" ?
         "openshift-console" : "openshift-apiserver"
@@ -45,10 +43,24 @@ class DeploymentTest extends BaseSpecification {
             .addLabel("app", "test")
             .setCommand(["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"])
 
+    // Image Sha is discovered dynamically in setupSpec() because the SHA StackRox indexes
+    // the image under depends on what the container runtime reports as the pod imageID, which
+    // varies by image format and architecture.
+    @Shared
+    private String deploymentImageSha
+
     def setupSpec() {
         orchestrator.createDeployment(DEPLOYMENT)
         ImageService.scanImage(DEPLOYMENT_IMAGE_NAME)
         assert Services.waitForVulnerabilitiesForImage(DEPLOYMENT)
+
+        // Discover the SHA by reading it from the deployment in StackRox.
+        // Sensor populates the deployment's image ID from the pod's imageID.
+        // Reading it from the scan result may give a different digest (manifest list vs arch-specific).
+        def roxDep = DeploymentService.getDeployment(DEPLOYMENT.deploymentUid)
+        deploymentImageSha = roxDep?.containersList?.first()?.image?.id?.replace("sha256:", "") ?: ""
+        assert deploymentImageSha : "Could not discover image SHA for ${DEPLOYMENT_IMAGE_NAME}"
+        log.info "Discovered deploymentImageSha: ${deploymentImageSha}"
     }
 
     def cleanupSpec() {
@@ -84,7 +96,7 @@ class DeploymentTest extends BaseSpecification {
         def img = null
         while (img == null && t.IsValid()) {
             img = ImageService.getImage(
-                    "sha256:"+DEPLOYMENT_IMAGE_SHA, false)
+                    "sha256:"+deploymentImageSha, false)
         }
         assert img != null
 
@@ -96,7 +108,7 @@ class DeploymentTest extends BaseSpecification {
         "Data inputs are: "
         query                                                            | _
         "Image:"+DEPLOYMENT_IMAGE_NAME                                   | _
-        "Image Sha:sha256:"+DEPLOYMENT_IMAGE_SHA                         | _
+        "Image Sha:sha256:"+deploymentImageSha                         | _
         "CVE:"+CVE_NO                                                    | _
         "CVE:"+CVE_NO+"+Fixable:true"                                    | _
         "Deployment:${DEPLOYMENT_NAME}+Image:r/quay.io.*"                | _
@@ -116,14 +128,14 @@ class DeploymentTest extends BaseSpecification {
         def img = null
         while (img == null && t.IsValid()) {
             img = ImageService.getImage(
-                    "sha256:"+DEPLOYMENT_IMAGE_SHA, false)
+                    "sha256:"+deploymentImageSha, false)
         }
         assert img != null
 
         then:
         def images = ImageService.getImages(RawQuery.newBuilder().setQuery(query).build())
         assert images.find {
-            x -> x.getId() == "sha256:"+DEPLOYMENT_IMAGE_SHA } != null
+            x -> x.getId() == "sha256:"+deploymentImageSha } != null
 
         where:
         "Data inputs are: "

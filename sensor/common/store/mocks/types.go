@@ -241,6 +241,59 @@ func (mr *MockPodStoreMockRecorder) GetByName(podName, namespace any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByName", reflect.TypeOf((*MockPodStore)(nil).GetByName), podName, namespace)
 }
 
+// MockNamespaceStore is a mock of NamespaceStore interface.
+type MockNamespaceStore struct {
+	ctrl     *gomock.Controller
+	recorder *MockNamespaceStoreMockRecorder
+	isgomock struct{}
+}
+
+// MockNamespaceStoreMockRecorder is the mock recorder for MockNamespaceStore.
+type MockNamespaceStoreMockRecorder struct {
+	mock *MockNamespaceStore
+}
+
+// NewMockNamespaceStore creates a new mock instance.
+func NewMockNamespaceStore(ctrl *gomock.Controller) *MockNamespaceStore {
+	mock := &MockNamespaceStore{ctrl: ctrl}
+	mock.recorder = &MockNamespaceStoreMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockNamespaceStore) EXPECT() *MockNamespaceStoreMockRecorder {
+	return m.recorder
+}
+
+// GetAll mocks base method.
+func (m *MockNamespaceStore) GetAll() []*storage.NamespaceMetadata {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAll")
+	ret0, _ := ret[0].([]*storage.NamespaceMetadata)
+	return ret0
+}
+
+// GetAll indicates an expected call of GetAll.
+func (mr *MockNamespaceStoreMockRecorder) GetAll() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockNamespaceStore)(nil).GetAll))
+}
+
+// LookupNamespaceLabelsByID mocks base method.
+func (m *MockNamespaceStore) LookupNamespaceLabelsByID(id string) (map[string]string, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LookupNamespaceLabelsByID", id)
+	ret0, _ := ret[0].(map[string]string)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// LookupNamespaceLabelsByID indicates an expected call of LookupNamespaceLabelsByID.
+func (mr *MockNamespaceStoreMockRecorder) LookupNamespaceLabelsByID(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupNamespaceLabelsByID", reflect.TypeOf((*MockNamespaceStore)(nil).LookupNamespaceLabelsByID), id)
+}
+
 // MockNetworkPolicyStore is a mock of NetworkPolicyStore interface.
 type MockNetworkPolicyStore struct {
 	ctrl     *gomock.Controller

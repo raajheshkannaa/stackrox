@@ -7,6 +7,7 @@ import (
 	"github.com/stackrox/rox/pkg/admissioncontrol"
 	"github.com/stackrox/rox/pkg/booleanpolicy"
 	"github.com/stackrox/rox/pkg/centralsensor"
+	"github.com/stackrox/rox/pkg/clusterlabels"
 	"github.com/stackrox/rox/pkg/concurrency"
 	"github.com/stackrox/rox/pkg/env"
 	pkgPolicies "github.com/stackrox/rox/pkg/policies"
@@ -25,10 +26,12 @@ type settingsManager struct {
 	hasClusterConfig, hasPolicies bool
 	centralEndpoint               string
 
-	clusterID clusterIDWaiter
+	clusterID     clusterIDWaiter
+	clusterLabels *clusterlabels.Store
 
 	deployments store.DeploymentStore
 	pods        store.PodStore
+	namespaces  store.NamespaceStore
 }
 
 type clusterIDWaiter interface {
@@ -36,16 +39,18 @@ type clusterIDWaiter interface {
 }
 
 // NewSettingsManager creates a new settings manager for admission control settings.
-func NewSettingsManager(clusterID clusterIDWaiter, deployments store.DeploymentStore, pods store.PodStore) SettingsManager {
+func NewSettingsManager(clusterID clusterIDWaiter, clusterLabels *clusterlabels.Store, deployments store.DeploymentStore, pods store.PodStore, namespaces store.NamespaceStore) SettingsManager {
 	return &settingsManager{
 		settingsStream:     concurrency.NewValueStream[*sensor.AdmissionControlSettings](nil),
 		sensorEventsStream: concurrency.NewValueStream[*sensor.AdmCtrlUpdateResourceRequest](nil),
 		centralEndpoint:    env.CentralEndpoint.Setting(),
 
-		clusterID: clusterID,
+		clusterID:     clusterID,
+		clusterLabels: clusterLabels,
 
 		deployments: deployments,
 		pods:        pods,
+		namespaces:  namespaces,
 	}
 }
 
@@ -59,6 +64,9 @@ func (p *settingsManager) newSettingsNoLock() *sensor.AdmissionControlSettings {
 	settings.Timestamp = protocompat.TimestampNow()
 	if centralcaps.Has(centralsensor.FlattenImageData) {
 		settings.FlattenImageData = true
+	}
+	if p.clusterLabels != nil {
+		settings.ClusterLabels = &sensor.ClusterLabels{Labels: p.clusterLabels.Get()}
 	}
 	return settings
 }
@@ -151,6 +159,17 @@ func (p *settingsManager) GetResourcesForSync() []*sensor.AdmCtrlUpdateResourceR
 			},
 		})
 	}
+
+	if p.namespaces != nil {
+		for _, ns := range p.namespaces.GetAll() {
+			ret = append(ret, &sensor.AdmCtrlUpdateResourceRequest{
+				Action: central.ResourceAction_CREATE_RESOURCE,
+				Resource: &sensor.AdmCtrlUpdateResourceRequest_Namespace{
+					Namespace: ns,
+				},
+			})
+		}
+	}
 	return ret
 }
 
@@ -160,10 +179,8 @@ func (p *settingsManager) UpdateResources(events ...*central.SensorEvent) {
 		case *central.SensorEvent_Synced, *central.SensorEvent_Deployment, *central.SensorEvent_Pod:
 			p.convertAndPush(event)
 		case *central.SensorEvent_Namespace:
-			// Track namespace deletion to removal sub-resources from admission control.
-			if event.GetAction() == central.ResourceAction_REMOVE_RESOURCE {
-				p.convertAndPush(event)
-			}
+			// Send all namespace events so admission control has namespace metadata for label-based policy scoping.
+			p.convertAndPush(event)
 		}
 	}
 }

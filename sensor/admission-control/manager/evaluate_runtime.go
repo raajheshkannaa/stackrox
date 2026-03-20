@@ -104,11 +104,21 @@ func (m *manager) evaluatePodEvent(s *state, req *admission.AdmissionRequest, ev
 		log.Debugf("Found deployment %s (id=%s) for %s/%s", deployment.GetName(), deployment.GetId(),
 			event.GetObject().GetNamespace(), event.GetObject().GetName())
 
+		// Create a request-scoped context for runtime detection so it respects admission timeouts.
+		var fetchImgCtx context.Context
+		if timeoutSecs := s.GetClusterConfig().GetAdmissionControllerConfig().GetTimeoutSeconds(); timeoutSecs > 1 {
+			var cancel context.CancelFunc
+			fetchImgCtx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
+			defer cancel()
+		} else {
+			fetchImgCtx = context.Background()
+		}
+
 		// Fast path: skip image fetches when no k8s event policies require deploy-time fields.
 		// Note: This webhook handles user-initiated commands (exec, port-forward) and
 		// lacks the requirement for burst resilience at scale, so this optimization is intentionally kept simple
 		if len(s.deployFieldK8sDetector.PolicySet().GetCompiledPolicies()) == 0 {
-			alerts, err := s.eventOnlyK8sDetector.DetectForDeploymentAndKubeEvent(context.Background(),
+			alerts, err := s.eventOnlyK8sDetector.DetectForDeploymentAndKubeEvent(fetchImgCtx,
 				booleanpolicy.EnhancedDeployment{
 					Deployment: deployment,
 					Images:     make([]*storage.Image, len(deployment.GetContainers())),
@@ -119,19 +129,12 @@ func (m *manager) evaluatePodEvent(s *state, req *admission.AdmissionRequest, ev
 			return alerts, true, nil
 		}
 
-		var fetchImgCtx context.Context
-		if timeoutSecs := s.GetClusterConfig().GetAdmissionControllerConfig().GetTimeoutSeconds(); timeoutSecs > 1 {
-			var cancel context.CancelFunc
-			fetchImgCtx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
-			defer cancel()
-		}
-
 		getAlertsFunc := func(dep *storage.Deployment, imgs []*storage.Image) ([]*storage.Alert, error) {
 			enhancedDeployment := booleanpolicy.EnhancedDeployment{
 				Deployment: dep,
 				Images:     imgs,
 			}
-			return s.allK8sEventDetector.DetectForDeploymentAndKubeEvent(context.Background(), enhancedDeployment, event)
+			return s.allK8sEventDetector.DetectForDeploymentAndKubeEvent(fetchImgCtx, enhancedDeployment, event)
 		}
 
 		alerts, err := m.kickOffImgScansAndDetect(fetchImgCtx, s, getAlertsFunc, deployment)
@@ -151,7 +154,17 @@ func (m *manager) evaluatePodEvent(s *state, req *admission.AdmissionRequest, ev
 		go m.waitForDeploymentAndDetect(s, event)
 	}
 
-	alerts, err := s.eventOnlyK8sDetector.DetectForDeploymentAndKubeEvent(context.Background(), booleanpolicy.EnhancedDeployment{}, event)
+	// Create a request-scoped context for runtime detection so it respects admission timeouts.
+	var detectionCtx context.Context
+	if timeoutSecs := s.GetClusterConfig().GetAdmissionControllerConfig().GetTimeoutSeconds(); timeoutSecs > 1 {
+		var cancel context.CancelFunc
+		detectionCtx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
+		defer cancel()
+	} else {
+		detectionCtx = context.Background()
+	}
+
+	alerts, err := s.eventOnlyK8sDetector.DetectForDeploymentAndKubeEvent(detectionCtx, booleanpolicy.EnhancedDeployment{}, event)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "runtime detection without deployment enrichment")
 	}
@@ -192,6 +205,8 @@ func (m *manager) waitForDeploymentAndDetect(s *state, event *storage.Kubernetes
 			var cancel context.CancelFunc
 			fetchImgCtx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
 			defer cancel()
+		} else {
+			fetchImgCtx = context.Background()
 		}
 
 		getAlertsFunc := func(dep *storage.Deployment, imgs []*storage.Image) ([]*storage.Alert, error) {
@@ -199,7 +214,7 @@ func (m *manager) waitForDeploymentAndDetect(s *state, event *storage.Kubernetes
 				Deployment: dep,
 				Images:     imgs,
 			}
-			return s.deployFieldK8sDetector.DetectForDeploymentAndKubeEvent(context.Background(), enhancedDeployment, event)
+			return s.deployFieldK8sDetector.DetectForDeploymentAndKubeEvent(fetchImgCtx, enhancedDeployment, event)
 		}
 
 		alerts, err := m.kickOffImgScansAndDetect(fetchImgCtx, s, getAlertsFunc, deployment)

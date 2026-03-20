@@ -144,6 +144,9 @@ func (m *manager) evaluateAdmissionRequest(s *state, req *admission.AdmissionReq
 			observeAdmissionReview(reviewResultBypassed, 0)
 			return pass(req.UID), nil // we only enforce on top-level objects
 		}
+
+		// Populate namespace ID for label-based policy scoping
+		m.enrichDeploymentWithNamespaceID(deployment)
 	}
 	log.Debugf("Evaluating policies on %+v", deployment)
 
@@ -244,4 +247,13 @@ func toPlaceholderImages(deployment *storage.Deployment) []*storage.Image {
 		images[i] = types.ToImage(c.GetImage())
 	}
 	return images
+}
+
+// enrichDeploymentWithNamespaceID populates the NamespaceId field for label-based policy scoping.
+func (m *manager) enrichDeploymentWithNamespaceID(deployment *storage.Deployment) {
+	if namespaceID, found := m.namespaces.LookupNamespaceIDByName(deployment.GetNamespace()); found {
+		deployment.NamespaceId = namespaceID
+	} else {
+		log.Warnf("No namespace ID found for namespace %s and deployment %q - namespace label scoping will not work", deployment.GetNamespace(), deployment.GetName())
+	}
 }

@@ -66,6 +66,20 @@ func TestSettingsToConfigMap(t *testing.T) {
 			},
 			expectNil: false,
 		},
+		{
+			settings: &sensor.AdmissionControlSettings{
+				ClusterConfig:              &storage.DynamicClusterConfig{},
+				EnforcedDeployTimePolicies: &storage.PolicyList{},
+				RuntimePolicies:            &storage.PolicyList{},
+				ClusterLabels: &sensor.ClusterLabels{
+					Labels: map[string]string{
+						"env":    "prod",
+						"region": "us-east-1",
+					},
+				},
+			},
+			expectNil: false,
+		},
 	}
 
 	for i, testCase := range cases {
@@ -91,4 +105,65 @@ func TestSettingsToConfigMap(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSettingsToConfigMap_ClusterLabels(t *testing.T) {
+	clusterLabels := map[string]string{
+		"env":    "prod",
+		"region": "us-east-1",
+		"team":   "platform",
+	}
+
+	settings := &sensor.AdmissionControlSettings{
+		ClusterConfig:              &storage.DynamicClusterConfig{},
+		EnforcedDeployTimePolicies: &storage.PolicyList{},
+		RuntimePolicies:            &storage.PolicyList{},
+		ClusterLabels:              &sensor.ClusterLabels{Labels: clusterLabels},
+	}
+
+	cm, err := settingsToConfigMap(settings)
+	require.NoError(t, err)
+	require.NotNil(t, cm)
+
+	// Verify cluster labels are in ConfigMap BinaryData
+	clusterLabelsGZ, ok := cm.BinaryData[admissioncontrol.ClusterLabelsGZDataKey]
+	require.True(t, ok, "cluster labels should be in ConfigMap BinaryData")
+	require.NotEmpty(t, clusterLabelsGZ)
+
+	// Decompress and verify content
+	clusterLabelsData, err := gziputil.Decompress(clusterLabelsGZ)
+	require.NoError(t, err)
+
+	var clusterLabelsProto sensor.ClusterLabels
+	err = clusterLabelsProto.UnmarshalVTUnsafe(clusterLabelsData)
+	require.NoError(t, err)
+
+	assert.Equal(t, clusterLabels, clusterLabelsProto.GetLabels())
+}
+
+func TestSettingsToConfigMap_EmptyClusterLabels(t *testing.T) {
+	settings := &sensor.AdmissionControlSettings{
+		ClusterConfig:              &storage.DynamicClusterConfig{},
+		EnforcedDeployTimePolicies: &storage.PolicyList{},
+		RuntimePolicies:            &storage.PolicyList{},
+		ClusterLabels:              &sensor.ClusterLabels{Labels: map[string]string{}},
+	}
+
+	cm, err := settingsToConfigMap(settings)
+	require.NoError(t, err)
+	require.NotNil(t, cm)
+
+	// Verify cluster labels key exists even with empty map
+	clusterLabelsGZ, ok := cm.BinaryData[admissioncontrol.ClusterLabelsGZDataKey]
+	require.True(t, ok)
+
+	// Decompress and verify it's an empty map
+	clusterLabelsData, err := gziputil.Decompress(clusterLabelsGZ)
+	require.NoError(t, err)
+
+	var clusterLabelsProto sensor.ClusterLabels
+	err = clusterLabelsProto.UnmarshalVTUnsafe(clusterLabelsData)
+	require.NoError(t, err)
+
+	assert.Empty(t, clusterLabelsProto.GetLabels())
 }

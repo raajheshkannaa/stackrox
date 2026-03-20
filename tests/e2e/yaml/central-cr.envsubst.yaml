@@ -71,7 +71,7 @@ $scannerV4DbPersistenceYaml
           memory: "500Mi"
         limits:
           cpu: "1000m"
-          memory: "2000Mi"
+          memory: "4000Mi"
 ---
 apiVersion: v1
 kind: Secret

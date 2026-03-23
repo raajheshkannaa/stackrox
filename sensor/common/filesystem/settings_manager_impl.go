@@ -9,6 +9,7 @@ import (
 	"github.com/stackrox/rox/pkg/logging"
 	pkgPolicies "github.com/stackrox/rox/pkg/policies"
 	"github.com/stackrox/rox/pkg/set"
+	"github.com/stackrox/rox/pkg/sync"
 	"github.com/stackrox/rox/sensor/common/configmap"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
@@ -25,6 +26,7 @@ var (
 )
 
 type factSettingsManager struct {
+	mutex          sync.Mutex
 	settingsUpdate *concurrency.ValueStream[*v1.ConfigMap]
 }
 
@@ -41,6 +43,9 @@ func (f *factSettingsManager) ConfigMapStream() concurrency.ReadOnlyValueStream[
 }
 
 func (f *factSettingsManager) UpdateFactSettings(policies []*storage.Policy) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	paths := f.extractFileActivityPaths(policies)
 
 	newSettings := &sensor.FactSettings{
@@ -57,7 +62,6 @@ func (f *factSettingsManager) extractFileActivityPaths(policies []*storage.Polic
 	for _, policy := range policies {
 		if !pkgPolicies.AppliesAtRunTime(policy) ||
 			!booleanpolicy.ContainsOneOf(policy, booleanpolicy.FileAccess) {
-			// doesn't contain file activity fields, so no paths to extract
 			continue
 		}
 

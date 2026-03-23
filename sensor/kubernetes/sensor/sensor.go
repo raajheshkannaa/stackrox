@@ -91,7 +91,10 @@ func CreateSensor(cfg *CreateOptions) (*sensor.Sensor, error) {
 	hm := heritage.NewHeritageManager(pods.GetPodNamespace(), cfg.k8sClient.Kubernetes().CoreV1(), time.Now())
 	storeProvider := resources.InitializeStore(hm)
 	admCtrlSettingsMgr := admissioncontroller.NewSettingsManager(clusterID, storeProvider.Deployments(), storeProvider.Pods())
-	factSettingsMgr := filesystem.NewFactSettingsManager()
+	var factSettingsMgr filesystem.SettingsManager
+	if features.SensitiveFileActivity.Enabled() {
+		factSettingsMgr = filesystem.NewFactSettingsManager()
+	}
 
 	helmManagedConfig, err := helm.GetHelmManagedConfig(storage.ServiceType_SENSOR_SERVICE)
 	if err != nil {

@@ -198,10 +198,13 @@ func (p *settingsManager) convertAndPush(event *central.SensorEvent) {
 }
 
 func settingsToConfigMap(settings *sensor.AdmissionControlSettings) (*v1.ConfigMap, error) {
+	if settings == nil {
+		return nil, nil
+	}
 	clusterConfig := settings.GetClusterConfig()
 	enforcedDeployTimePolicies := settings.GetEnforcedDeployTimePolicies()
 	runtimePolicies := settings.GetRuntimePolicies()
-	if settings == nil || clusterConfig == nil || enforcedDeployTimePolicies == nil || runtimePolicies == nil {
+	if clusterConfig == nil || enforcedDeployTimePolicies == nil || runtimePolicies == nil {
 		return nil, nil
 	}
 

@@ -71,7 +71,6 @@ COPY scripts/entrypoint.sh \
 COPY bin/scanner /usr/local/bin/
 COPY THIRD_PARTY_NOTICES/ /THIRD_PARTY_NOTICES/
 
-# Copy vulnerability mappings
 COPY --from=mappings /mappings/repository-to-cpe.json /mappings/container-name-repos-map.json /run/mappings/
 
 # This is equivalent to nobody:nobody.

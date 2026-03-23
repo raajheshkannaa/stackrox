@@ -24,7 +24,9 @@ FROM registry.access.redhat.com/ubi8/ubi:latest@sha256:627867e53ad6846afba2dfbf5
 # Copy ubi-micro base to preserve rpmdb
 COPY --from=ubi-micro-base / /out/
 
-# Install packages not in ubi-micro (bash and coreutils-single already present)
+# Install packages directly to /out/ using --installroot
+# Note: --setopt=reposdir=/etc/yum.repos.d instructs dnf to use repo configurations pointing to RPMs
+# prefetched by Hermeto/Cachi2, instead of installroot's default UBI repos.
 RUN dnf install -y \
     --installroot=/out/ \
     --releasever=8 \

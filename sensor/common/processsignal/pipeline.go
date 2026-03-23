@@ -219,7 +219,7 @@ func (p *pubsubPipeline) Stop() error {
 func (p *pubsubPipeline) Process(indicator *storage.ProcessIndicator) {
 	event := NewUnenrichedProcessIndicatorEvent(context.Background(), indicator)
 	if err := p.pubSubDispatcher.Publish(event); err != nil {
-		dropSignal(indicator.GetSignal(), "Failed to published to dispatcher")
+		dropSignal(indicator.GetSignal(), "Failed to publish to dispatcher")
 	}
 }
 
@@ -270,14 +270,12 @@ func PopulateIndicatorFromContainer(indicator *storage.ProcessIndicator, cachedC
 	indicator.ImageId = cachedContainer.ImageID
 }
 
-// Shutdown closes all communication channels and shutdowns the enricher
+// Shutdown closes all communication channels and shuts down the enricher.
+// The stopper is owned by the inner pipeline (basePipeline); Shutdown
+// delegates entirely to inner.Stop() which signals the stopper, waits
+// for the enricher, and waits for the stopper to report stopped.
 func (p *Pipeline) Shutdown() {
-	defer func() {
-		_ = p.inner.Stop()
-		_ = p.stopper.Client().Stopped().Wait()
-	}()
-
-	p.stopper.Client().Stop()
+	_ = p.inner.Stop()
 }
 
 // WaitForShutdown waits for the pipeline shutdown to complete.

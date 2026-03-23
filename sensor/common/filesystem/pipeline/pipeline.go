@@ -164,13 +164,35 @@ func (p *Pipeline) translateWithIndicator(fs *sensorAPI.FileActivity, indicator 
 	return access
 }
 
-func (p *Pipeline) translate(fs *sensorAPI.FileActivity) *storage.FileAccess {
-	indicator := p.getIndicator(fs)
-	if indicator == nil {
-		return nil
+func (p *Pipeline) buildIndicator(fs *sensorAPI.FileActivity) *storage.ProcessIndicator {
+	process := fs.GetProcess()
+	signal := &storage.ProcessSignal{
+		Id:           process.GetId(),
+		Uid:          process.GetUid(),
+		Gid:          process.GetGid(),
+		Time:         process.GetCreationTime(),
+		Name:         process.GetName(),
+		Args:         process.GetArgs(),
+		ExecFilePath: process.GetExecFilePath(),
+		Pid:          process.GetPid(),
+		Scraped:      process.GetScraped(),
+		ContainerId:  process.GetContainerId(),
+		LineageInfo:  make([]*storage.ProcessSignal_LineageInfo, 0, len(process.GetLineageInfo())),
 	}
 
-	return p.translateWithIndicator(fs, indicator)
+	for _, lineage := range process.GetLineageInfo() {
+		signal.LineageInfo = append(signal.LineageInfo,
+			&storage.ProcessSignal_LineageInfo{
+				ParentUid:          lineage.GetParentUid(),
+				ParentExecFilePath: lineage.GetParentExecFilePath(),
+			},
+		)
+	}
+
+	return &storage.ProcessIndicator{
+		Id:     uuid.NewV4().String(),
+		Signal: signal,
+	}
 }
 
 func cacheKey(containerID, processSignalID string) string {
@@ -255,39 +277,20 @@ func (p *Pipeline) processEnrichedIndicator(event pubsub.Event) error {
 	return nil
 }
 
-func (p *Pipeline) getIndicator(fs *sensorAPI.FileActivity) *storage.ProcessIndicator {
+func (p *Pipeline) processFileActivity(fs *sensorAPI.FileActivity) {
 	process := fs.GetProcess()
-	signal := &storage.ProcessSignal{
-		Id:           process.GetId(),
-		Uid:          process.GetUid(),
-		Gid:          process.GetGid(),
-		Time:         process.GetCreationTime(),
-		Name:         process.GetName(),
-		Args:         process.GetArgs(),
-		ExecFilePath: process.GetExecFilePath(),
-		Pid:          process.GetPid(),
-		Scraped:      process.GetScraped(),
-		ContainerId:  process.GetContainerId(),
-		LineageInfo:  make([]*storage.ProcessSignal_LineageInfo, 0, len(process.GetLineageInfo())),
+	if process == nil {
+		return
 	}
 
-	for _, lineage := range process.GetLineageInfo() {
-		signal.LineageInfo = append(signal.LineageInfo,
-			&storage.ProcessSignal_LineageInfo{
-				ParentUid:          lineage.GetParentUid(),
-				ParentExecFilePath: lineage.GetParentExecFilePath(),
-			},
-		)
-	}
+	indicator := p.buildIndicator(fs)
 
-	pi := &storage.ProcessIndicator{
-		Id:     uuid.NewV4().String(),
-		Signal: signal,
-	}
-
+	// Host processes (no container ID) bypass enrichment entirely.
 	if process.GetContainerId() == "" {
-		// Process is running on the host (not in a container)
-		return pi
+		if access := p.translateWithIndicator(fs, indicator); access != nil {
+			p.detector.ProcessFileAccess(p.msgCtx, access)
+		}
+		return
 	}
 
 	if features.SensorInternalPubSub.Enabled() && p.pubSubDispatcher != nil {
@@ -295,23 +298,24 @@ func (p *Pipeline) getIndicator(fs *sensorAPI.FileActivity) *storage.ProcessIndi
 		// to avoid a TOCTOU race where the enriched callback fires before
 		// the activity is buffered.
 		p.bufferActivity(fs)
-		event := processsignal.NewUnenrichedProcessIndicatorEvent(p.msgCtx, pi)
+		event := processsignal.NewUnenrichedProcessIndicatorEvent(p.msgCtx, indicator)
 		if err := p.pubSubDispatcher.Publish(event); err != nil {
 			log.Errorf("Failed to publish unenriched process indicator for file activity: %v", err)
 		}
-		return nil
+		return
 	}
 
+	// Legacy path: enrich directly from cluster entities store.
 	metadata, ok, _ := p.clusterEntities.LookupByContainerID(process.GetContainerId())
 	if !ok {
-		// unexpected - process should exist before file activity is
-		// reported
 		log.Warnf("Container ID: %s not found for file activity", process.GetContainerId())
 	} else {
-		processsignal.PopulateIndicatorFromContainer(pi, metadata)
+		processsignal.PopulateIndicatorFromContainer(indicator, metadata)
 	}
 
-	return pi
+	if access := p.translateWithIndicator(fs, indicator); access != nil {
+		p.detector.ProcessFileAccess(p.msgCtx, access)
+	}
 }
 
 func (p *Pipeline) cleanupExpiredBuffers() {
@@ -370,10 +374,7 @@ func (p *Pipeline) run() {
 				// Channel closed, no more messages
 				return
 			}
-			event := p.translate(fs)
-			if event != nil {
-				p.detector.ProcessFileAccess(p.msgCtx, event)
-			}
+			p.processFileActivity(fs)
 		}
 	}
 }

@@ -111,6 +111,19 @@ func (e *enricher) processUnenrichedIndicator(event pubsub.Event) error {
 	return nil
 }
 
+// add attempts to enrich the indicator immediately if container metadata is
+// available, otherwise caches it for later enrichment.
+//
+// Thread-safety: the hashicorp/golang-lru cache is internally synchronised, so
+// concurrent calls from processLoop (via scanAndEnrich) and pub/sub consumer
+// callbacks are safe.
+//
+// Deadlock-safety: when called from an UnenrichedProcessIndicatorLane callback,
+// enrich() may publish to the EnrichedProcessIndicatorLane. This is safe because
+// each lane runs its own goroutine and the DefaultConsumer executes callbacks in
+// a separate goroutine, so the unenriched lane is never blocked on its own
+// channel. Back-pressure is possible if the enriched lane's channel is full, but
+// this is bounded and will resolve as the enriched lane drains.
 func (e *enricher) add(indicator *storage.ProcessIndicator) {
 	if indicator == nil || indicator.GetSignal() == nil {
 		return
@@ -144,9 +157,7 @@ func (e *enricher) Stopped() concurrency.ReadOnlyErrorSignal {
 
 func (e *enricher) processLoop(ctx context.Context) {
 	defer e.stopper.Flow().ReportStopped()
-	defer func() {
-		close(e.indicators)
-	}()
+	defer close(e.indicators)
 	ticker := time.NewTicker(enrichInterval)
 	expirationTicker := time.NewTicker(pruneInterval)
 	for {

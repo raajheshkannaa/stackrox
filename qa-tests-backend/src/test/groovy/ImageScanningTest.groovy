@@ -51,7 +51,7 @@ class ImageScanningTest extends BaseSpecification {
     static final private String OCI_IMAGE   = "quay.io/rhacs-eng/qa:oci-manifest"
     static final private String LIST_IMAGE_OCI_MANIFEST = "quay.io/rhacs-eng/qa:list-image-oci-manifest"
     static final private String AR_IMAGE =
-        "us-west1-docker.pkg.dev/acs-san-stackroxci/artifact-registry-test/nginx:1.17"
+        "us-west1-docker.pkg.dev/acs-san-stackroxci/artifact-registry-test/nginx:3.21-1-amd64"
     static final private String UBI9_MINIMAL_IMAGE = "quay.io/rhacs-eng/qa:ubi9-minimal-9.5-1747111267-amd64"
     static final private String UBI9_MINIMAL_ECHO_IMAGE = "quay.io/rhacs-eng/qa:ubi9-minimal-9.5-1747111267-amd64-echo"
     static final private String LINEAGE_IMAGE_A = "quay.io/rhacs-eng/qa:lineage-jdk-17.0.11"
@@ -480,9 +480,6 @@ class ImageScanningTest extends BaseSpecification {
     @Tag("BAT")
     @Tag("Integration")
     def "Verify Scan Results from Registries - #registry.name() - #component:#version - #image - #cve - #idx"() {
-        // The current images in the AR repo are too old to produce scan results with Scanner V4.
-        Assume.assumeFalse("Skipping: AR image produces no results with Scanner V4", scannerV4Enabled)
-
         ImageIntegrationService.addStackroxScannerIntegration()
 
         when:
@@ -518,8 +515,8 @@ class ImageScanningTest extends BaseSpecification {
         where:
         "Data inputs are: "
 
-        registry                     | component | version   | idx | cve              | image
-        new GoogleArtifactRegistry() | "gcc-8"   | "8.3.0-6" | 0   | "CVE-2018-12886" | AR_IMAGE
+        registry                     | component   | version     | idx | cve              | image
+        new GoogleArtifactRegistry() | "libxslt"   | "1.1.32-r0" | 4   | "CVE-2019-11068" | AR_IMAGE
     }
 
     static final private IMAGES_FOR_ERROR_TESTS = [

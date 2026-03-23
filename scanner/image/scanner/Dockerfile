@@ -33,7 +33,6 @@ RUN dnf install \
     dnf --installroot=/out/ clean all && \
     rm -rf /out/var/cache/dnf /out/var/cache/yum
 
-# Copy scripts needed for CA trust setup
 COPY scripts/save-dir-contents /out/usr/local/bin/
 
 # The contents of paths mounted as emptyDir volumes in Kubernetes are saved

@@ -211,6 +211,11 @@ func (p *pubsubPipeline) Start() error {
 }
 
 func (p *pubsubPipeline) Stop() error {
+	// In pub/sub mode there is no sendIndicatorEvent goroutine to call
+	// ReportStopped, so we must do it here before basePipeline.Stop()
+	// waits on the stopper.
+	p.stopper.Flow().ReportStopped()
+
 	errlist := errorhelpers.NewErrorList("stopping pubsub pipeline")
 	if err := p.basePipeline.Stop(); err != nil {
 		errlist.AddError(err)

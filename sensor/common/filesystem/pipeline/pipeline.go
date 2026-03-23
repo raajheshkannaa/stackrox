@@ -72,20 +72,22 @@ func NewFileSystemPipeline(detector detector.Detector, clusterEntities *clustere
 	}
 
 	if features.SensorInternalPubSub.Enabled() && pubSubDispatcher != nil {
-		log.Info("File system pipeline using pub/sub mode for process enrichment")
-
 		if err := pubSubDispatcher.RegisterConsumerToLane(
 			pubsub.EnrichedProcessConsumer,
 			pubsub.EnrichedProcessIndicatorTopic,
 			pubsub.EnrichedProcessIndicatorLane,
 			p.processEnrichedIndicator,
 		); err != nil {
-			log.Errorf("Failed to register consumer for enriched process indicators in file system pipeline: %v", err)
+			log.Errorf("Failed to register consumer for enriched process indicators, falling back to legacy mode: %v", err)
+			p.pubSubDispatcher = nil
+		} else {
+			log.Info("File system pipeline using pub/sub mode for process enrichment")
+			p.wg.Add(1)
+			go p.cleanupExpiredBuffers()
 		}
+	}
 
-		p.wg.Add(1)
-		go p.cleanupExpiredBuffers()
-	} else {
+	if p.pubSubDispatcher == nil {
 		log.Info("File system pipeline using legacy mode (direct enrichment)")
 	}
 
@@ -220,7 +222,6 @@ func (p *Pipeline) bufferActivity(fs *sensorAPI.FileActivity) {
 	if !exists {
 		entry = &bufferedActivityEntry{
 			activities: make([]*sensorAPI.FileActivity, 0, 10),
-			timestamp:  time.Now(),
 		}
 		p.bufferedActivity[key] = entry
 	}
@@ -233,6 +234,7 @@ func (p *Pipeline) bufferActivity(fs *sensorAPI.FileActivity) {
 	}
 
 	entry.activities = append(entry.activities, fs)
+	entry.timestamp = time.Now()
 	p.totalBufferedActivity++
 	metrics.SetFileActivityBufferSize(p.totalBufferedActivity)
 }
@@ -344,7 +346,7 @@ func (p *Pipeline) pruneExpiredBuffers() {
 		if now.Sub(entry.timestamp) > bufferedActivityTTL {
 			expiredKeys = append(expiredKeys, key)
 			p.totalBufferedActivity -= len(entry.activities)
-			metrics.IncrementFileActivityBufferDrops()
+			metrics.IncrementFileActivityBufferDropsBy(len(entry.activities))
 		}
 	}
 

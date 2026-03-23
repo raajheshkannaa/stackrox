@@ -454,6 +454,11 @@ func IncrementFileActivityBufferDrops() {
 	fileActivityBufferDrops.Inc()
 }
 
+// IncrementFileActivityBufferDropsBy increments the number of file activities dropped by the given count.
+func IncrementFileActivityBufferDropsBy(count int) {
+	fileActivityBufferDrops.Add(float64(count))
+}
+
 // SetFileActivityBufferSize sets the file activity buffer size.
 func SetFileActivityBufferSize(size int) {
 	fileActivityBufferSize.Set(float64(size))

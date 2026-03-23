@@ -78,7 +78,10 @@ func (p *basePipeline) sendToCentral(msg *message.ExpiringMessage) {
 	}
 }
 
-// processEnrichedIndicator replaces the sendIndicatorEvent goroutine in legacy mode.
+// processEnrichedIndicator handles an enriched process indicator event.
+// In pub/sub mode it is registered as a consumer callback; in legacy mode
+// it is called by channelPipeline.sendIndicatorEvent for each indicator
+// from the channel multiplexer.
 func (p *basePipeline) processEnrichedIndicator(event pubsub.Event) error {
 	enrichedEvent, ok := event.(*EnrichedProcessIndicatorEvent)
 	if !ok {

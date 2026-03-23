@@ -11,7 +11,7 @@ FROM ubi-base AS package_installer
 # Copy ubi-micro base to preserve rpmdb
 COPY --from=ubi-micro-base / /out/
 
-# Install packages not in ubi-micro (bash and coreutils-single already present)
+# Install packages directly to /out/ using --installroot
 RUN dnf install \
     --installroot=/out/ \
     --releasever=8 \

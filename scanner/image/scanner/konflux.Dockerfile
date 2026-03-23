@@ -36,7 +36,7 @@ RUN dnf install -y \
     openssl \
     util-linux && \
     dnf clean all --installroot=/out/ && \
-    rm -rf /out/var/cache/*
+    rm -rf /out/var/cache/dnf /out/var/cache/yum
 
 COPY --from=builder \
     /src/scanner/image/scanner/scripts/entrypoint.sh \

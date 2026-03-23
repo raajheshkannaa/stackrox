@@ -62,7 +62,6 @@ COPY --from=dependency_builder /out/ /
 
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-# Copy application scripts and binaries
 COPY scripts/entrypoint.sh \
      scripts/import-additional-cas \
      scripts/restore-all-dir-contents \

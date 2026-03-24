@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_8_golang_1.25@sha256:aa03597ee8c7594ffecef5cbb6a0f059d362259d2a41225617b27ec912a3d0d3 AS builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.25@sha256:bd531796aacb86e4f97443797262680fbf36ca048717c00b6f4248465e1a7c0c AS builder
 
 ARG BUILD_TAG
 RUN if [[ "$BUILD_TAG" == "" ]]; then >&2 echo "error: required BUILD_TAG arg is unset"; exit 6; fi
@@ -17,9 +17,9 @@ WORKDIR /src
 RUN make -C scanner NODEPS=1 CGO_ENABLED=1 image/scanner/bin/scanner copy-scripts
 
 
-FROM registry.access.redhat.com/ubi8/ubi-micro:latest@sha256:37552f11d3b39b3360f7be7c13f6a617e468f39be915cd4f8c8a8531ffc9d43d AS ubi-micro-base
+FROM registry.access.redhat.com/ubi9/ubi-micro:latest@sha256:093a704be0eaef9bb52d9bc0219c67ee9db13c2e797da400ddb5d5ae6849fa10 AS ubi-micro-base
 
-FROM registry.access.redhat.com/ubi8/ubi:latest@sha256:627867e53ad6846afba2dfbf5cef1d54c868a9025633ef0afd546278d4654eac AS package_installer
+FROM registry.access.redhat.com/ubi9/ubi:latest@sha256:6ed9f6f637fe731d93ec60c065dbced79273f1e0b5f512951f2c0b0baedb16ad AS package_installer
 
 # Copy ubi-micro base to preserve rpmdb
 COPY --from=ubi-micro-base / /out/
@@ -29,7 +29,7 @@ COPY --from=ubi-micro-base / /out/
 # prefetched by Hermeto/Cachi2, instead of installroot's default UBI repos.
 RUN dnf install -y \
     --installroot=/out/ \
-    --releasever=8 \
+    --releasever=9 \
     --setopt=install_weak_deps=False \
     --setopt=reposdir=/etc/yum.repos.d \
     --nodocs \
@@ -62,7 +62,7 @@ COPY LICENSE /out/licenses/LICENSE
 # contents are then restored by the script `restore-all-dir-contents`
 # during the container start.
 RUN chown -R 65534:65534 /out/tmp /out/etc/pki/ca-trust /out/etc/ssl && \
-    chroot /out /usr/local/bin/save-dir-contents /etc/pki/ca-trust /etc/ssl
+    chroot /out /usr/local/bin/save-dir-contents /etc/pki/ca-trust/source
 
 
 FROM ubi-micro-base
@@ -79,7 +79,7 @@ LABEL \
     io.k8s.display-name="scanner-v4" \
     io.openshift.tags="rhacs,scanner-v4,stackrox" \
     maintainer="Red Hat, Inc." \
-    name="advanced-cluster-security/rhacs-scanner-v4-rhel8" \
+    name="advanced-cluster-security/rhacs-scanner-v4-rhel9" \
     # Custom Snapshot creation in `operator-bundle-pipeline` depends on source-location label to be set correctly.
     source-location="https://github.com/stackrox/stackrox" \
     summary="The image scanner v4 for Red Hat Advanced Cluster Security for Kubernetes" \

@@ -1,5 +1,5 @@
-FROM registry.access.redhat.com/ubi8:latest AS ubi-base
-FROM registry.access.redhat.com/ubi8/ubi-micro:latest AS ubi-micro-base
+FROM registry.access.redhat.com/ubi9:latest AS ubi-base
+FROM registry.access.redhat.com/ubi9/ubi-micro:latest AS ubi-micro-base
 
 FROM ubi-base AS mappings
 
@@ -14,7 +14,7 @@ COPY --from=ubi-micro-base / /out/
 # Install packages directly to /out/ using --installroot
 RUN dnf install \
     --installroot=/out/ \
-    --releasever=8 \
+    --releasever=9 \
     --setopt=install_weak_deps=0 \
     --nodocs \
     -y \
@@ -32,7 +32,7 @@ COPY scripts/save-dir-contents /out/usr/local/bin/
 # during the container start.
 # Setup CA trust directories with proper permissions in /out/
 RUN chown -R 65534:65534 /out/etc/pki/ca-trust /out/etc/ssl /out/tmp && \
-    chroot /out /usr/local/bin/save-dir-contents /etc/pki/ca-trust /etc/ssl
+    chroot /out /usr/local/bin/save-dir-contents /etc/pki/ca-trust/source
 
 FROM ubi-micro-base
 

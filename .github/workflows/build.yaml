@@ -210,7 +210,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
         uses: ./.github/actions/cache-go-dependencies
         with:
-          key-suffix: ${{ matrix.name == 'race-condition-debug' && 'race' || '' }}
+          key-suffix: ${{ (matrix.name == 'race-condition-debug' && 'race') || '' }}
 
       - uses: ./.github/actions/handle-tagged-build
 

@@ -748,8 +748,8 @@ class ImageScanningTest extends BaseSpecification {
 
         and:
         "Delete UBI9 image and ensure echo still same number of vulns"
-        ImageService.deleteImages(
-                SearchServiceOuterClass.RawQuery.newBuilder().setQuery("Image:${UBI9_MINIMAL_ECHO_IMAGE}").build(), true)
+        ImageService.deleteImages(SearchServiceOuterClass.RawQuery.newBuilder().setQuery(
+            "Image:${UBI9_MINIMAL_ECHO_IMAGE}").build(), true)
         def actualDetails = ImageService.getImage(expectedDetails.id)
         assert actualDetails.scan.componentsList.sum { it.vulnsList.size() } > 0
 

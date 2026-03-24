@@ -132,6 +132,17 @@ function PolicyWizard({ pageAction, policy }: PolicyWizardProps): ReactElement {
     }, [policy]);
 
     function onStepChange(_event, currentStep: WizardStepType): void {
+        if (currentStep.id === POLICY_BEHAVIOR_ACTIONS_ID) {
+            const hasStaleMarker = values.enforcementActions?.some(
+                (a) => a === 'UNSET_ENFORCEMENT'
+            );
+            if (hasStaleMarker) {
+                void formik.setFieldValue(
+                    'enforcementActions',
+                    values.enforcementActions.filter((a) => a !== 'UNSET_ENFORCEMENT')
+                );
+            }
+        }
         setStepId(currentStep.id);
         scrollToTop();
     }

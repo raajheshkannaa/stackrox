@@ -21,135 +21,72 @@ const (
 	tailored = storage.ComplianceOperatorProfileV2_TAILORED_PROFILE
 )
 
-func TestResolveEligibleProfileNames_OOBOnAllClusters(t *testing.T) {
+// buildByName is a test helper that groups a profile list the same way filterNonEquivalentTPs does.
+func buildByName(profiles []*storage.ComplianceOperatorProfileV2) map[string][]*storage.ComplianceOperatorProfileV2 {
+	byName := make(map[string][]*storage.ComplianceOperatorProfileV2)
+	for _, p := range profiles {
+		byName[p.GetName()] = append(byName[p.GetName()], p)
+	}
+	return byName
+}
+
+func TestApplyEquivalenceFilter_OOBPassesThrough(t *testing.T) {
 	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("ocp4-cis", "cluster-1", standard, ""),
-		makeProfile("ocp4-cis", "cluster-2", standard, ""),
+		makeProfile("ocp4-cis", "c1", standard, ""),
+		makeProfile("ocp4-cis", "c2", standard, ""),
 	}
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 2, false)
-	assert.Empty(t, tailoredNames)
-	assert.Equal(t, []string{"ocp4-cis"}, standardNames)
+	names := []string{"ocp4-cis"}
+	got := applyEquivalenceFilter(names, buildByName(profiles))
+	assert.Equal(t, []string{"ocp4-cis"}, got)
 }
 
-func TestResolveEligibleProfileNames_TPSameHashAllClusters(t *testing.T) {
+func TestApplyEquivalenceFilter_TPSameHashPassesThrough(t *testing.T) {
 	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("my-tp", "cluster-1", tailored, "hash-abc"),
-		makeProfile("my-tp", "cluster-2", tailored, "hash-abc"),
+		makeProfile("my-tp", "c1", tailored, "hash-abc"),
+		makeProfile("my-tp", "c2", tailored, "hash-abc"),
 	}
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 2, false)
-	assert.Equal(t, []string{"my-tp"}, tailoredNames)
-	assert.Empty(t, standardNames)
+	names := []string{"my-tp"}
+	got := applyEquivalenceFilter(names, buildByName(profiles))
+	assert.Equal(t, []string{"my-tp"}, got)
 }
 
-func TestResolveEligibleProfileNames_TPDifferentHashExcluded(t *testing.T) {
+func TestApplyEquivalenceFilter_TPDifferentHashExcluded(t *testing.T) {
 	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("my-tp", "cluster-1", tailored, "hash-abc"),
-		makeProfile("my-tp", "cluster-2", tailored, "hash-xyz"),
+		makeProfile("my-tp", "c1", tailored, "hash-abc"),
+		makeProfile("my-tp", "c2", tailored, "hash-xyz"),
 	}
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 2, false)
-	assert.Empty(t, tailoredNames)
-	assert.Empty(t, standardNames)
+	names := []string{"my-tp"}
+	got := applyEquivalenceFilter(names, buildByName(profiles))
+	assert.Empty(t, got)
 }
 
-func TestResolveEligibleProfileNames_MixedKindExcluded(t *testing.T) {
+func TestApplyEquivalenceFilter_AllEmptyHashEquivalent(t *testing.T) {
 	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("mixed", "cluster-1", standard, ""),
-		makeProfile("mixed", "cluster-2", tailored, "hash-abc"),
+		makeProfile("my-tp", "c1", tailored, ""),
+		makeProfile("my-tp", "c2", tailored, ""),
 	}
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 2, false)
-	assert.Empty(t, tailoredNames)
-	assert.Empty(t, standardNames)
+	names := []string{"my-tp"}
+	got := applyEquivalenceFilter(names, buildByName(profiles))
+	assert.Equal(t, []string{"my-tp"}, got)
 }
 
-func TestResolveEligibleProfileNames_NotOnAllClustersExcluded(t *testing.T) {
+func TestApplyEquivalenceFilter_PreservesOrder(t *testing.T) {
 	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("ocp4-cis", "cluster-1", standard, ""),
-		// missing from cluster-2
+		makeProfile("tp-a", "c1", tailored, "h"),
+		makeProfile("tp-a", "c2", tailored, "h"),
+		makeProfile("tp-bad", "c1", tailored, "h1"),
+		makeProfile("tp-bad", "c2", tailored, "h2"),
+		makeProfile("ocp4-cis", "c1", standard, ""),
+		makeProfile("ocp4-cis", "c2", standard, ""),
 	}
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 2, false)
-	assert.Empty(t, tailoredNames)
-	assert.Empty(t, standardNames)
+	names := []string{"tp-a", "tp-bad", "ocp4-cis"}
+	got := applyEquivalenceFilter(names, buildByName(profiles))
+	assert.Equal(t, []string{"tp-a", "ocp4-cis"}, got)
 }
 
-func TestResolveEligibleProfileNames_SingleCluster(t *testing.T) {
-	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("my-tp", "cluster-1", tailored, "hash-abc"),
-	}
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 1, false)
-	assert.Equal(t, []string{"my-tp"}, tailoredNames)
-	assert.Empty(t, standardNames)
-}
-
-func TestResolveEligibleProfileNames_SkipHashIncludesTPsWithDifferentHashes(t *testing.T) {
-	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("my-tp", "cluster-1", tailored, "hash-abc"),
-		makeProfile("my-tp", "cluster-2", tailored, "hash-xyz"),
-	}
-	// skipHash=true: different hashes should not exclude the tailored profile
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 2, true)
-	assert.Equal(t, []string{"my-tp"}, tailoredNames)
-	assert.Empty(t, standardNames)
-}
-
-func TestResolveEligibleProfileNames_AllEmptyHashEquivalent(t *testing.T) {
-	// All-empty hash is treated as equivalent (sensor bug fallback).
-	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("my-tp", "cluster-1", tailored, ""),
-		makeProfile("my-tp", "cluster-2", tailored, ""),
-	}
-	tailoredNames, standardNames := resolveEligibleProfileNames(profiles, 2, false)
-	assert.Equal(t, []string{"my-tp"}, tailoredNames)
-	assert.Empty(t, standardNames)
-}
-
-func TestGroupProfilesByName(t *testing.T) {
-	profiles := []*storage.ComplianceOperatorProfileV2{
-		makeProfile("a", "c1", standard, ""),
-		makeProfile("a", "c2", standard, ""),
-		makeProfile("b", "c1", tailored, "h"),
-	}
-	got := groupProfilesByName(profiles)
-	assert.Len(t, got["a"], 2)
-	assert.Len(t, got["b"], 1)
-	assert.Len(t, got, 2)
-}
-
-func TestRetainPresentOnAllClusters(t *testing.T) {
-	input := map[string][]*storage.ComplianceOperatorProfileV2{
-		"present-on-both": {makeProfile("present-on-both", "c1", standard, ""), makeProfile("present-on-both", "c2", standard, "")},
-		"only-one":        {makeProfile("only-one", "c1", standard, "")},
-	}
-	got := retainPresentOnAllClusters(input, 2)
-	assert.Contains(t, got, "present-on-both")
-	assert.NotContains(t, got, "only-one")
-}
-
-func TestPartitionByKind(t *testing.T) {
-	input := map[string][]*storage.ComplianceOperatorProfileV2{
-		"tailored": {makeProfile("tailored", "c1", tailored, "h"), makeProfile("tailored", "c2", tailored, "h")},
-		"standard": {makeProfile("standard", "c1", standard, ""), makeProfile("standard", "c2", standard, "")},
-		"mixed":    {makeProfile("mixed", "c1", standard, ""), makeProfile("mixed", "c2", tailored, "h")},
-	}
-	tailoredGroups, standardGroups := partitionByKind(input)
-	assert.Contains(t, tailoredGroups, "tailored")
-	assert.Contains(t, standardGroups, "standard")
-	assert.NotContains(t, tailoredGroups, "mixed")
-	assert.NotContains(t, standardGroups, "mixed")
-}
-
-func TestTailoredNamesWithConsistentHash(t *testing.T) {
-	input := map[string][]*storage.ComplianceOperatorProfileV2{
-		"same-hash": {makeProfile("same-hash", "c1", tailored, "abc"), makeProfile("same-hash", "c2", tailored, "abc")},
-		"diff-hash": {makeProfile("diff-hash", "c1", tailored, "abc"), makeProfile("diff-hash", "c2", tailored, "xyz")},
-	}
-	names := tailoredNamesWithConsistentHash(input, false)
-	assert.Contains(t, names, "same-hash")
-	assert.NotContains(t, names, "diff-hash")
-
-	// skipHash bypasses the check
-	names = tailoredNamesWithConsistentHash(input, true)
-	assert.Contains(t, names, "same-hash")
-	assert.Contains(t, names, "diff-hash")
+func TestApplyEquivalenceFilter_EmptyInput(t *testing.T) {
+	got := applyEquivalenceFilter(nil, nil)
+	assert.Nil(t, got)
 }
 
 func TestTailoredProfilesEquivalent(t *testing.T) {

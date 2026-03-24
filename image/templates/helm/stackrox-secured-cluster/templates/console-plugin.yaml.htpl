@@ -7,7 +7,7 @@
   https://access.redhat.com/solutions/4870701
 */ -}}
 {{- $kubeVersion := semver $.Capabilities.KubeVersion.Version -}}
-{{- if and (eq ._rox.env.installMethod "operator") ._rox.consolePlugin.enabled (ge (int $kubeVersion.Minor) 32) (lt (int $kubeVersion.Minor) 35) -}}
+{{- if and (eq ._rox.env.installMethod "operator") ._rox.consolePlugin.enabled (ge (int $kubeVersion.Minor) 32) (lt (int $kubeVersion.Minor) 34) -}}
 apiVersion: console.openshift.io/v1
 kind: ConsolePlugin
 metadata:

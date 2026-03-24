@@ -12,6 +12,8 @@ import (
 	"github.com/stackrox/rox/central/ranking"
 	v1 "github.com/stackrox/rox/generated/api/v1"
 	"github.com/stackrox/rox/generated/storage"
+	"github.com/stackrox/rox/pkg/errox"
+	"github.com/stackrox/rox/pkg/logging"
 	"github.com/stackrox/rox/pkg/postgres/pgutils"
 	"github.com/stackrox/rox/pkg/sac"
 	"github.com/stackrox/rox/pkg/sac/effectiveaccessscope"
@@ -23,13 +25,17 @@ import (
 
 //go:generate mockgen-wrapper
 
+var (
+	log = logging.LoggerForModule()
+)
+
 // DataStore provides storage and indexing functionality for namespaces.
 type DataStore interface {
 	GetNamespace(ctx context.Context, id string) (*storage.NamespaceMetadata, bool, error)
 	GetAllNamespaces(ctx context.Context) ([]*storage.NamespaceMetadata, error)
 	GetNamespacesForSAC() ([]effectiveaccessscope.Namespace, error)
 	GetManyNamespaces(ctx context.Context, id []string) ([]*storage.NamespaceMetadata, error)
-	GetNamespaceLabels(ctx context.Context, namespaceID string) (map[string]string, error)
+	GetNamespaceLabels(ctx context.Context, clusterID string, namespaceName string) (map[string]string, error)
 
 	AddNamespace(context.Context, *storage.NamespaceMetadata) error
 	UpdateNamespace(context.Context, *storage.NamespaceMetadata) error
@@ -273,15 +279,25 @@ func (b *datastoreImpl) updateNamespacePriority(nss ...*storage.NamespaceMetadat
 }
 
 // GetNamespaceLabels returns the labels for the specified namespace.
-func (b *datastoreImpl) GetNamespaceLabels(ctx context.Context, namespaceID string) (map[string]string, error) {
-	namespace, exists, err := b.GetNamespace(ctx, namespaceID)
+func (b *datastoreImpl) GetNamespaceLabels(ctx context.Context, clusterID string, namespaceName string) (map[string]string, error) {
+	q := search.NewQueryBuilder().
+		AddExactMatches(search.Namespace, namespaceName).
+		AddExactMatches(search.ClusterID, clusterID).
+		ProtoQuery()
+
+	namespaces, err := b.SearchNamespaces(ctx, q)
 	if err != nil {
 		return nil, err
 	}
-	if !exists {
+	if len(namespaces) == 0 {
 		return nil, nil
 	}
-	return namespace.GetLabels(), nil
+	if len(namespaces) > 1 {
+		// This shouldn't happen - namespace names are unique within a cluster
+		log.Errorf("Found %d namespaces for cluster %q and name %q (expected 1)", len(namespaces), clusterID, namespaceName)
+		return nil, errox.InvariantViolation.Newf("found multiple namespaces for cluster %q and name %q", clusterID, namespaceName)
+	}
+	return namespaces[0].GetLabels(), nil
 }
 
 // NamespaceSearchResultConverter implements search.SearchResultConverter for namespace search results.
